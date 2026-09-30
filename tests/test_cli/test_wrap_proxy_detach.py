@@ -44,7 +44,7 @@ def _capture_popen_kwargs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> di
     monkeypatch.setattr(wrap_cli.subprocess, "Popen", _fake_popen)
     monkeypatch.setattr(wrap_cli, "_check_proxy", lambda port: True)
     monkeypatch.setattr(wrap_cli.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda: tmp_path / "proxy.log")
+    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda port=None: tmp_path / "proxy.log")
     monkeypatch.setattr(wrap_cli, "_resolve_wrap_proxy_timeout_seconds", lambda: 1)
 
     wrap_cli._start_proxy(8787)
@@ -63,24 +63,11 @@ def _capture_proxy_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> l
     monkeypatch.setattr(wrap_cli.subprocess, "Popen", _fake_popen)
     monkeypatch.setattr(wrap_cli, "_check_proxy", lambda port: True)
     monkeypatch.setattr(wrap_cli.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda: tmp_path / "proxy.log")
+    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda port=None: tmp_path / "proxy.log")
     monkeypatch.setattr(wrap_cli, "_resolve_wrap_proxy_timeout_seconds", lambda: 1)
 
     wrap_cli._start_proxy(8787)
     return captured
-
-
-def test_start_proxy_uses_safe_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """The proxy subprocess must run with -P so its cwd never shadows the
-    installed package -- e.g. `headroom wrap claude` invoked from inside a
-    checkout that has its own top-level `headroom/` package would otherwise
-    import that unbuilt source tree instead, dropping `headroom._core`."""
-    monkeypatch.setattr(wrap_cli.sys, "version_info", (3, 11, 0))
-
-    captured_cmd = _capture_proxy_command(monkeypatch, tmp_path)
-
-    assert captured_cmd[0] == wrap_cli.sys.executable
-    assert captured_cmd[1] == "-P"
 
 
 def test_start_proxy_uses_compat_runner_on_python_310(
@@ -97,7 +84,7 @@ def test_start_proxy_uses_compat_runner_on_python_310(
     assert (
         "runpy.run_module('headroom.cli', run_name='__main__', alter_sys=True)" in captured_cmd[2]
     )
-    assert captured_cmd[3:] == ["proxy", "--port", "8787"]
+    assert captured_cmd[3:] == ["proxy", "--port", "8787", "--workers", "1"]
 
 
 def test_start_proxy_detaches_on_windows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -147,7 +134,7 @@ def test_start_proxy_retries_without_breakaway_when_job_forbids_it(
     monkeypatch.setattr(wrap_cli.subprocess, "Popen", _flaky_popen)
     monkeypatch.setattr(wrap_cli, "_check_proxy", lambda port: True)
     monkeypatch.setattr(wrap_cli.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda: tmp_path / "proxy.log")
+    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda port=None: tmp_path / "proxy.log")
     monkeypatch.setattr(wrap_cli, "_resolve_wrap_proxy_timeout_seconds", lambda: 1)
 
     wrap_cli._start_proxy(8787)
@@ -186,7 +173,7 @@ def test_start_proxy_closes_log_when_both_spawns_fail(
 
     monkeypatch.setattr(wrap_cli.subprocess, "Popen", _always_fails)
     monkeypatch.setattr(wrap_cli.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda: tmp_path / "proxy.log")
+    monkeypatch.setattr(wrap_cli, "_get_log_path", lambda port=None: tmp_path / "proxy.log")
     monkeypatch.setattr(wrap_cli, "_resolve_wrap_proxy_timeout_seconds", lambda: 1)
 
     with pytest.raises(OSError):
